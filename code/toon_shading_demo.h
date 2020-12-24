@@ -41,7 +41,7 @@ struct scene_globals
 
 struct gpu_instance_entry
 {
-    m4 WTransform;
+    m4 WVTransform;
     m4 WVPTransform;
     v4 Color;
     float SpecularPower;
@@ -53,6 +53,7 @@ struct gpu_instance_entry
 struct instance_entry
 {
     u32 MeshId;
+    b32 IsSnow;
     gpu_instance_entry GpuData;
 };
 
@@ -75,6 +76,15 @@ struct water_entry
 struct gpu_water_inputs
 {
     float Time;
+};
+
+//
+// NOTE: Snow Data
+//
+
+struct gpu_snow_globals
+{
+    v3 SnowFallDir; // NOTE: In View Space
 };
 
 struct render_mesh
@@ -100,7 +110,7 @@ struct renderer_create_info
     render_scene* Scene;
 };
 
-#include "forward.h"
+#include "tiled_deferred.h"
 
 struct render_scene
 {
@@ -132,6 +142,9 @@ struct render_scene
     instance_entry* OpaqueInstances;
     VkBuffer OpaqueInstanceBuffer;
 
+    // NOTE: Snow Data
+    VkBuffer SnowGlobalBuffer;
+    
     // NOTE: Water Instances
     u32 MaxNumWaterInstances;
     u32 NumWaterInstances;
@@ -164,7 +177,7 @@ struct demo_state
     u32 Cube;
     u32 Sphere;
 
-    forward_state ForwardState;
+    tiled_deferred_state TiledDeferredState;
 };
 
 global demo_state* DemoState;

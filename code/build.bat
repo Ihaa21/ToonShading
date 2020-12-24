@@ -24,11 +24,18 @@ pushd %OutputDir%
 del *.pdb > NUL 2> NUL
 
 REM USING GLSL IN VK USING GLSLANGVALIDATOR
-call glslangValidator -DFORWARD_VERTEX=1 -S vert -e main -g -V -o %DataDir%\shader_forward_vert.spv %CodeDir%\shader_forward.cpp
-call glslangValidator -DFORWARD_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\shader_forward_frag.spv %CodeDir%\shader_forward.cpp
+call glslangValidator -DGRID_FRUSTUM=1 -S comp -e main -g -V -o %DataDir%\shader_tiled_deferred_grid_frustum.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DLIGHT_CULLING=1 -S comp -e main -g -V -o %DataDir%\shader_tiled_deferred_light_culling.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DGBUFFER_VERT=1 -S vert -e main -g -V -o %DataDir%\shader_tiled_deferred_gbuffer_vert.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DGBUFFER_FRAG=1 -S frag -e main -g -V -o %DataDir%\shader_tiled_deferred_gbuffer_frag.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DTILED_DEFERRED_LIGHTING_VERT=1 -S vert -e main -g -V -o %DataDir%\shader_tiled_deferred_lighting_vert.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DTILED_DEFERRED_LIGHTING_FRAG=1 -S frag -e main -g -V -o %DataDir%\shader_tiled_deferred_lighting_frag.spv %CodeDir%\tiled_deferred_shaders.cpp
 
-call glslangValidator -DWATER_VERTEX=1 -S vert -e main -g -V -o %DataDir%\shader_water_vert.spv %CodeDir%\shader_forward.cpp
-call glslangValidator -DWATER_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\shader_water_frag.spv %CodeDir%\shader_forward.cpp
+call glslangValidator -DGBUFFER_SNOW_VERT=1 -S vert -e main -g -V -o %DataDir%\shader_tiled_deferred_gbuffer_snow_vert.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DGBUFFER_SNOW_FRAG=1 -S frag -e main -g -V -o %DataDir%\shader_tiled_deferred_gbuffer_snow_frag.spv %CodeDir%\tiled_deferred_shaders.cpp
+
+call glslangValidator -DWATER_VERTEX=1 -S vert -e main -g -V -o %DataDir%\shader_water_vert.spv %CodeDir%\tiled_deferred_shaders.cpp
+call glslangValidator -DWATER_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\shader_water_frag.spv %CodeDir%\tiled_deferred_shaders.cpp
 
 call glslangValidator -DFRAGMENT_SHADER=1 -S frag -e main -g -V -o %DataDir%\shader_copy_to_swap_frag.spv %CodeDir%\shader_copy_to_swap.cpp
 

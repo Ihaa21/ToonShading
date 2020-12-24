@@ -21,7 +21,7 @@ struct water_entry
 
 struct instance_entry
 {
-    mat4 WTransform;
+    mat4 WVTransform;
     mat4 WVPTransform;
     vec4 Color;
     float SpecularPower;
@@ -60,5 +60,10 @@ struct instance_entry
     {                                                                   \
         water_entry WaterBuffer[];                                      \
     };                                                                  \
+                                                                        \
+    layout(set = set_number, binding = 6) uniform snow_buffer           \
+    {                                                                   \
+        vec3 SnowFallDir;                                               \
+    } SnowBuffer;                                                       \
                                                                         \
     

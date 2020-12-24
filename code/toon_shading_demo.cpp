@@ -1,6 +1,6 @@
 
 #include "toon_shading_demo.h"
-#include "forward.cpp"
+#include "tiled_deferred.cpp"
 
 //
 // NOTE: Asset Storage System
@@ -32,14 +32,16 @@ inline u32 SceneMeshAdd(render_scene* Scene, vk_image Color, vk_image Normal, pr
     return Result;
 }
 
-inline void SceneOpaqueInstanceAdd(render_scene* Scene, u32 MeshId, m4 WTransform, v4 Color, float SpecularPower, float RimBound, float RimThreshold)
+inline void SceneOpaqueInstanceAdd(render_scene* Scene, u32 MeshId, m4 WTransform, v4 Color, float SpecularPower, float RimBound,
+                                   float RimThreshold, b32 IsSnow = false)
 {
     Assert(Scene->NumOpaqueInstances < Scene->MaxNumOpaqueInstances);
 
     instance_entry* Instance = Scene->OpaqueInstances + Scene->NumOpaqueInstances++;
     Instance->MeshId = MeshId;
-    Instance->GpuData.WTransform = WTransform;
-    Instance->GpuData.WVPTransform = CameraGetVP(&Scene->Camera)*Instance->GpuData.WTransform;
+    Instance->IsSnow = IsSnow;
+    Instance->GpuData.WVTransform = CameraGetV(&Scene->Camera)*WTransform;
+    Instance->GpuData.WVPTransform = CameraGetP(&Scene->Camera)*Instance->GpuData.WVTransform;
     Instance->GpuData.Color = Color;
     Instance->GpuData.SpecularPower = SpecularPower;
     Instance->GpuData.RimBound = RimBound;
@@ -69,7 +71,7 @@ inline void ScenePointLightAdd(render_scene* Scene, v3 Pos, v3 Color, f32 MaxDis
 
 inline void SceneDirectionalLightSet(render_scene* Scene, v3 LightDir, v3 Color, v3 AmbientColor, v3 BoundsMin, v3 BoundsMax)
 {
-    Scene->DirectionalLight.Dir = LightDir;
+    Scene->DirectionalLight.Dir = (CameraGetV(&Scene->Camera) * V4(LightDir, 0)).xyz;
     Scene->DirectionalLight.Color = Color;
     Scene->DirectionalLight.AmbientColor = AmbientColor;
 }
@@ -211,6 +213,10 @@ DEMO_INIT(Init)
         Scene->WaterInstanceBuffer = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                                     sizeof(water_entry)*Scene->MaxNumWaterInstances);
+
+        Scene->SnowGlobalBuffer = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
+                                                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                                 sizeof(gpu_snow_globals));
         
         // NOTE: Create general descriptor set layouts
         {
@@ -229,6 +235,7 @@ DEMO_INIT(Init)
                 VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
                 VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
                 VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
+                VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
                 VkDescriptorLayoutEnd(RenderState->Device, &Builder);
             }
         }
@@ -241,6 +248,7 @@ DEMO_INIT(Init)
         VkDescriptorBufferWrite(&RenderState->DescriptorManager, Scene->SceneDescriptor, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, Scene->PointLightTransforms);
         VkDescriptorBufferWrite(&RenderState->DescriptorManager, Scene->SceneDescriptor, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, Scene->DirectionalLightGpu);
         VkDescriptorBufferWrite(&RenderState->DescriptorManager, Scene->SceneDescriptor, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, Scene->WaterInstanceBuffer);
+        VkDescriptorBufferWrite(&RenderState->DescriptorManager, Scene->SceneDescriptor, 6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, Scene->SnowGlobalBuffer);
     }
 
     // NOTE: Create render data
@@ -254,7 +262,7 @@ DEMO_INIT(Init)
         CreateInfo.MaterialDescLayout = DemoState->Scene.MaterialDescLayout;
         CreateInfo.SceneDescLayout = DemoState->Scene.SceneDescLayout;
         CreateInfo.Scene = &DemoState->Scene;
-        ForwardCreate(CreateInfo, &DemoState->CopyToSwapDesc, &DemoState->ForwardState);
+        TiledDeferredCreate(CreateInfo, &DemoState->CopyToSwapDesc, &DemoState->TiledDeferredState);
     }
 
     // NOTE: Copy To Swap FullScreen Pass
@@ -300,16 +308,17 @@ DEMO_INIT(Init)
         DemoState->Quad = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushQuad());
         DemoState->Cube = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushCube());
         DemoState->Sphere = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushSphere(64, 64));
+        TiledDeferredAddMeshes(&DemoState->TiledDeferredState, Scene->RenderMeshes + DemoState->Quad);
 
         // NOTE: Push water data
         {
-            DemoState->ForwardState.PerlinNoise = TextureLoad("PerlinNoise.png", VK_FORMAT_R8G8B8A8_UNORM, false, sizeof(u8), 4);
-            VkDescriptorImageWrite(&RenderState->DescriptorManager, DemoState->ForwardState.WaterDescriptor, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                   DemoState->ForwardState.PerlinNoise.View, DemoState->ForwardState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            DemoState->TiledDeferredState.PerlinNoise = TextureLoad("PerlinNoise.png", VK_FORMAT_R8G8B8A8_UNORM, false, sizeof(u8), 4);
+            VkDescriptorImageWrite(&RenderState->DescriptorManager, DemoState->TiledDeferredState.WaterDescriptor, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                   DemoState->TiledDeferredState.PerlinNoise.View, DemoState->TiledDeferredState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            DemoState->ForwardState.Distortion = TextureLoad("WaterDistortion.png", VK_FORMAT_R8G8B8A8_UNORM, false, sizeof(u8), 4);
-            VkDescriptorImageWrite(&RenderState->DescriptorManager, DemoState->ForwardState.WaterDescriptor, 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                   DemoState->ForwardState.Distortion.View, DemoState->ForwardState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            DemoState->TiledDeferredState.Distortion = TextureLoad("WaterDistortion.png", VK_FORMAT_R8G8B8A8_UNORM, false, sizeof(u8), 4);
+            VkDescriptorImageWrite(&RenderState->DescriptorManager, DemoState->TiledDeferredState.WaterDescriptor, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                   DemoState->TiledDeferredState.Distortion.View, DemoState->TiledDeferredState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         
         VkDescriptorManagerFlush(RenderState->Device, &RenderState->DescriptorManager);
@@ -333,8 +342,8 @@ DEMO_SWAPCHAIN_CHANGE(SwapChainChange)
 
     DemoState->Scene.Camera.AspectRatio = f32(RenderState->WindowWidth / RenderState->WindowHeight);
     
-    ForwardSwapChainChange(&DemoState->ForwardState, RenderState->WindowWidth, RenderState->WindowHeight,
-                           DemoState->SwapChainFormat, &DemoState->Scene, &DemoState->CopyToSwapDesc);
+    TiledDeferredSwapChainChange(&DemoState->TiledDeferredState, RenderState->WindowWidth, RenderState->WindowHeight,
+                                 DemoState->SwapChainFormat, &DemoState->Scene, &DemoState->CopyToSwapDesc);
 }
 
 DEMO_CODE_RELOAD(CodeReload)
@@ -417,6 +426,10 @@ DEMO_MAIN_LOOP(MainLoop)
                 
                 SceneOpaqueInstanceAdd(Scene, DemoState->Sphere, M4Pos(V3(0.0f, 0.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
                                        32, 0.716, 0.1);
+
+                // NOTE: Snow
+                SceneOpaqueInstanceAdd(Scene, DemoState->Sphere, M4Pos(V3(0.0f, 3.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
+                                       32, 0.716, 0.1, true);
                 
                 SceneOpaqueInstanceAdd(Scene, DemoState->Cube, M4Pos(V3(-3, 0, 0)) * M4Scale(V3(1, 10, 10)), V4(0.7f, 0.3f, 0.3f, 1.0f),
                                        64, 0.9, 0.1);
@@ -473,6 +486,17 @@ DEMO_MAIN_LOOP(MainLoop)
                 GpuData[InstanceId] = Scene->WaterInstances[InstanceId].GpuData;
             }
         }
+
+        // NOTE: Push snow data
+        {
+            gpu_snow_globals* Data = VkTransferPushWriteStruct(&RenderState->TransferManager, Scene->SnowGlobalBuffer, gpu_snow_globals,
+                                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
+                                                            BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+            *Data = {};
+
+            v3 Dir = Normalize(V3(0.2f, -1.0f, 0.0f));
+            Data->SnowFallDir = (CameraGetV(&Scene->Camera) * V4(Dir, 0.0f)).xyz;
+        }
         
         // NOTE: Push Point Lights
         if (Scene->NumPointLights > 0)
@@ -515,9 +539,9 @@ DEMO_MAIN_LOOP(MainLoop)
 
         // NOTE: Push water inputs
         {
-            gpu_water_inputs* Data = VkTransferPushWriteStruct(&RenderState->TransferManager, DemoState->ForwardState.WaterInputsBuffer, gpu_water_inputs,
-                                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
-                                                            BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+            gpu_water_inputs* Data = VkTransferPushWriteStruct(&RenderState->TransferManager, DemoState->TiledDeferredState.WaterInputsBuffer, gpu_water_inputs,
+                                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
+                                                               BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
             *Data = {};
 
             // TODO: Hacky
@@ -531,7 +555,7 @@ DEMO_MAIN_LOOP(MainLoop)
     }
 
     // NOTE: Render Scene
-    ForwardRender(Commands, &DemoState->ForwardState, &DemoState->Scene);
+    TiledDeferredRender(Commands, &DemoState->TiledDeferredState, &DemoState->Scene);
     FullScreenPassRender(Commands, &DemoState->CopyToSwapPass);
     
     VkCheckResult(vkEndCommandBuffer(Commands.Buffer));

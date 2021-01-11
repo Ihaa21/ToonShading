@@ -166,9 +166,8 @@ struct demo_state
     VkFormat SwapChainFormat;
     render_target_entry SwapChainEntry;
     render_target CopyToSwapTarget;
-    VkDescriptorSetLayout CopyToSwapDescLayout;
     VkDescriptorSet CopyToSwapDesc;
-    render_fullscreen_pass CopyToSwapPass;
+    vk_pipeline* CopyToSwapPipeline;
 
     render_scene Scene;
 
@@ -176,6 +175,7 @@ struct demo_state
     u32 Quad;
     u32 Cube;
     u32 Sphere;
+    u32 Face;
 
     tiled_deferred_state TiledDeferredState;
 };

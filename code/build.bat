@@ -6,16 +6,13 @@ set LibsDir=..\libs
 set OutputDir=..\build_win32
 set VulkanIncludeDir="C:\VulkanSDK\1.2.135.0\Include\vulkan"
 set VulkanBinDir="C:\VulkanSDK\1.2.135.0\Bin"
-set AssimpIncludeDir="%LibsDir%\assimp-5.0.1\include"
-set AssimpLibDir=%LibsDir%\assimp-5.0.1\lib\RelWithDebInfo
-
-REM %AssimpLibDir%\assimp-vc142-mt.lib
+set AssimpDir=%LibsDir%\framework_vulkan
 
 set CommonCompilerFlags=-Od -MTd -nologo -fp:fast -fp:except- -EHsc -Gm- -GR- -EHa- -Zo -Oi -WX -W4 -wd4127 -wd4201 -wd4100 -wd4189 -wd4505 -Z7 -FC
 set CommonCompilerFlags=-I %VulkanIncludeDir% %CommonCompilerFlags%
-set CommonCompilerFlags=-I %LibsDir% -I %AssimpIncludeDir% %CommonCompilerFlags%
+set CommonCompilerFlags=-I %LibsDir% -I %AssimpDir% %CommonCompilerFlags%
 REM Check the DLLs here
-set CommonLinkerFlags=-incremental:no -opt:ref user32.lib gdi32.lib Winmm.lib opengl32.lib DbgHelp.lib d3d12.lib dxgi.lib d3dcompiler.lib 
+set CommonLinkerFlags=-incremental:no -opt:ref user32.lib gdi32.lib Winmm.lib opengl32.lib DbgHelp.lib d3d12.lib dxgi.lib d3dcompiler.lib %AssimpDir%\assimp\libs\assimp-vc142-mt.lib
 
 IF NOT EXIST %OutputDir% mkdir %OutputDir%
 
@@ -42,6 +39,9 @@ call glslangValidator -DFRAGMENT_SHADER=1 -S frag -e main -g -V -o %DataDir%\sha
 REM USING HLSL IN VK USING DXC
 REM set DxcDir=C:\Tools\DirectXShaderCompiler\build\Debug\bin
 REM %DxcDir%\dxc.exe -spirv -T cs_6_0 -E main -fspv-target-env=vulkan1.1 -Fo ..\data\write_cs.o -Fh ..\data\write_cs.o.txt ..\code\bw_write_shader.cpp
+
+REM ASSIMP
+copy %AssimpDir%\assimp\bin\assimp-vc142-mt.dll %OutputDir%\assimp-vc142-mt.dll
 
 REM 64-bit build
 echo WAITING FOR PDB > lock.tmp

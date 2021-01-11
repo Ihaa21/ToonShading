@@ -152,12 +152,6 @@ DEMO_INIT(Init)
 
     // NOTE: Copy To Swap RT
     {
-        {
-            vk_descriptor_layout_builder Builder = VkDescriptorLayoutBegin(&DemoState->CopyToSwapDescLayout);
-            VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-            VkDescriptorLayoutEnd(RenderState->Device, &Builder);
-        }
-
         render_target_builder Builder = RenderTargetBuilderBegin(&DemoState->Arena, &DemoState->TempArena, RenderState->WindowWidth,
                                                                  RenderState->WindowHeight);
         RenderTargetAddTarget(&Builder, &DemoState->SwapChainEntry, VkClearColorCreate(0, 0, 0, 1));
@@ -173,6 +167,8 @@ DEMO_INIT(Init)
         VkRenderPassSubPassEnd(&RpBuilder);
 
         DemoState->CopyToSwapTarget = RenderTargetBuilderEnd(&Builder, VkRenderPassBuilderEnd(&RpBuilder, RenderState->Device));
+        DemoState->CopyToSwapDesc = VkDescriptorSetAllocate(RenderState->Device, RenderState->DescriptorPool, RenderState->CopyImageDescLayout);
+        DemoState->CopyToSwapPipeline = FullScreenCopyImageCreate(DemoState->CopyToSwapTarget.RenderPass, 0);
     }
 
     // NOTE: Init scene system
@@ -253,7 +249,6 @@ DEMO_INIT(Init)
 
     // NOTE: Create render data
     DemoState->SwapChainFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    DemoState->CopyToSwapDesc = VkDescriptorSetAllocate(RenderState->Device, RenderState->DescriptorPool, DemoState->CopyToSwapDescLayout);
     {
         renderer_create_info CreateInfo = {};
         CreateInfo.Width = RenderState->WindowWidth; //710;
@@ -264,10 +259,6 @@ DEMO_INIT(Init)
         CreateInfo.Scene = &DemoState->Scene;
         TiledDeferredCreate(CreateInfo, &DemoState->CopyToSwapDesc, &DemoState->TiledDeferredState);
     }
-
-    // NOTE: Copy To Swap FullScreen Pass
-    DemoState->CopyToSwapPass = FullScreenPassCreate("shader_copy_to_swap_frag.spv", "main", &DemoState->CopyToSwapTarget, 1,
-                                                     &DemoState->CopyToSwapDescLayout, 1, &DemoState->CopyToSwapDesc);
     
     // NOTE: Upload assets
     vk_commands Commands = RenderState->Commands;
@@ -308,6 +299,7 @@ DEMO_INIT(Init)
         DemoState->Quad = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushQuad());
         DemoState->Cube = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushCube());
         DemoState->Sphere = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushSphere(64, 64));
+        DemoState->Face = SceneMeshAdd(Scene, WhiteTexture, WhiteTexture, AssetsPushModel("Suzanne.gltf"));
         TiledDeferredAddMeshes(&DemoState->TiledDeferredState, Scene->RenderMeshes + DemoState->Quad);
 
         // NOTE: Push water data
@@ -428,7 +420,7 @@ DEMO_MAIN_LOOP(MainLoop)
                                        32, 0.716, 0.1);
 
                 // NOTE: Snow
-                SceneOpaqueInstanceAdd(Scene, DemoState->Sphere, M4Pos(V3(0.0f, 3.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
+                SceneOpaqueInstanceAdd(Scene, DemoState->Face, M4Pos(V3(0.0f, 3.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
                                        32, 0.716, 0.1, true);
                 
                 SceneOpaqueInstanceAdd(Scene, DemoState->Cube, M4Pos(V3(-3, 0, 0)) * M4Scale(V3(1, 10, 10)), V4(0.7f, 0.3f, 0.3f, 1.0f),
@@ -556,7 +548,10 @@ DEMO_MAIN_LOOP(MainLoop)
 
     // NOTE: Render Scene
     TiledDeferredRender(Commands, &DemoState->TiledDeferredState, &DemoState->Scene);
-    FullScreenPassRender(Commands, &DemoState->CopyToSwapPass);
+
+    RenderTargetPassBegin(&DemoState->CopyToSwapTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
+    FullScreenPassRender(Commands, DemoState->CopyToSwapPipeline, 1, &DemoState->CopyToSwapDesc);
+    RenderTargetPassEnd(Commands);
     
     VkCheckResult(vkEndCommandBuffer(Commands.Buffer));
                     

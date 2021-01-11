@@ -363,7 +363,7 @@ void main()
 // NOTE: Snow inputs
 vec3 SnowColor = vec3(0.75, 0.75, 1);
 float SnowHeight = 0.05;
-float SnowAmount = 0.25;
+float SnowAmount = 0.1;
 
 #if GBUFFER_SNOW_VERT
 

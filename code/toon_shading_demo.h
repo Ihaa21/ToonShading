@@ -178,6 +178,8 @@ struct demo_state
     u32 Face;
 
     tiled_deferred_state TiledDeferredState;
+
+    ui_state UiState;
 };
 
 global demo_state* DemoState;

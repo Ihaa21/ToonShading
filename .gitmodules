@@ -13,3 +13,6 @@
 [submodule "libs/math"]
 	path = libs/math
 	url = https://github.com/Ihaa21/math.git
+[submodule "libs/ui"]
+	path = libs/ui
+	url = https://github.com/Ihaa21/ui.git

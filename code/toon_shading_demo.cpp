@@ -318,6 +318,13 @@ DEMO_INIT(Init)
     }
     
     VkCommandsSubmit(RenderState->GraphicsQueue, Commands);
+
+    // NOTE: Create UI
+    DemoState->UiState = UiStateCreate(RenderState->Device, &DemoState->Arena, &DemoState->TempArena, &RenderState->GpuArena,
+                                       &RenderState->DescriptorManager, &RenderState->PipelineManager,
+                                       DemoState->Scene.RenderMeshes[DemoState->Quad].VertexBuffer,
+                                       DemoState->Scene.RenderMeshes[DemoState->Quad].IndexBuffer,
+                                       DemoState->CopyToSwapTarget.RenderPass, 0);
 }
 
 DEMO_DESTROY(Destroy)
@@ -365,6 +372,41 @@ DEMO_MAIN_LOOP(MainLoop)
 
     RenderTargetUpdateEntries(&DemoState->TempArena, &DemoState->CopyToSwapTarget);
     
+    // NOTE: Update Ui State
+    {
+        ui_state* UiState = &DemoState->UiState;
+
+        UiStateBegin(UiState, RenderState->WindowWidth, RenderState->WindowHeight);
+        
+        local_global v4 ButtonColor = V4(1, 1, 1, 1);
+        switch (UiButton(UiState, AabbCenterRadius(V2(100), V2(50)), ButtonColor))
+        {
+            case UiInteraction_Hover:
+            {
+                ButtonColor = V4(1, 0, 0, 1);
+            } break;
+
+            case UiInteraction_Selected:
+            {
+                ButtonColor = V4(0, 1, 0, 1);
+            } break;
+
+            case UiInteraction_Released:
+            {
+                ButtonColor = V4(1, 0, 1, 1);
+            } break;
+
+            default:
+            {
+                ButtonColor = V4(1, 1, 1, 1);
+            } break;
+        }
+
+        // if (UiButton(UiState, "Test Text"))
+
+        UiStateEnd(UiState);
+    }
+
     // NOTE: Upload scene data
     {
         render_scene* Scene = &DemoState->Scene;
@@ -551,6 +593,7 @@ DEMO_MAIN_LOOP(MainLoop)
 
     RenderTargetPassBegin(&DemoState->CopyToSwapTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
     FullScreenPassRender(Commands, DemoState->CopyToSwapPipeline, 1, &DemoState->CopyToSwapDesc);
+    UiStateRender(&DemoState->UiState, Commands);
     RenderTargetPassEnd(Commands);
     
     VkCheckResult(vkEndCommandBuffer(Commands.Buffer));

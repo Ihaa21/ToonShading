@@ -34,7 +34,9 @@ call glslangValidator -DGBUFFER_SNOW_FRAG=1 -S frag -e main -g -V -o %DataDir%\s
 call glslangValidator -DWATER_VERTEX=1 -S vert -e main -g -V -o %DataDir%\shader_water_vert.spv %CodeDir%\tiled_deferred_shaders.cpp
 call glslangValidator -DWATER_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\shader_water_frag.spv %CodeDir%\tiled_deferred_shaders.cpp
 
-call glslangValidator -DFRAGMENT_SHADER=1 -S frag -e main -g -V -o %DataDir%\shader_copy_to_swap_frag.spv %CodeDir%\shader_copy_to_swap.cpp
+REM REMOVE
+REM call glslangValidator -DRECT_VERTEX=1 -S vert -e main -g -V -o %DataDir%\ui_rect_vert.spv %LibsDir%\ui\ui_shaders.cpp
+REM call glslangValidator -DRECT_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\ui_rect_frag.spv %LibsDir%\ui\ui_shaders.cpp
 
 REM USING HLSL IN VK USING DXC
 REM set DxcDir=C:\Tools\DirectXShaderCompiler\build\Debug\bin

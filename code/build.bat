@@ -37,6 +37,8 @@ call glslangValidator -DWATER_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\shad
 REM REMOVE
 REM call glslangValidator -DRECT_VERTEX=1 -S vert -e main -g -V -o %DataDir%\ui_rect_vert.spv %LibsDir%\ui\ui_shaders.cpp
 REM call glslangValidator -DRECT_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\ui_rect_frag.spv %LibsDir%\ui\ui_shaders.cpp
+REM call glslangValidator -DGLYPH_VERTEX=1 -S vert -e main -g -V -o %DataDir%\ui_glyph_vert.spv %LibsDir%\ui\ui_shaders.cpp
+REM call glslangValidator -DGLYPH_FRAGMENT=1 -S frag -e main -g -V -o %DataDir%\ui_glyph_frag.spv %LibsDir%\ui\ui_shaders.cpp
 
 REM USING HLSL IN VK USING DXC
 REM set DxcDir=C:\Tools\DirectXShaderCompiler\build\Debug\bin

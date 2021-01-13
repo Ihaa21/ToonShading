@@ -312,19 +312,17 @@ DEMO_INIT(Init)
             VkDescriptorImageWrite(&RenderState->DescriptorManager, DemoState->TiledDeferredState.WaterDescriptor, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                    DemoState->TiledDeferredState.Distortion.View, DemoState->TiledDeferredState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
+
+        // NOTE: Create UI
+        UiStateCreate(RenderState->Device, &DemoState->Arena, &DemoState->TempArena, RenderState->LocalMemoryId,
+                      &RenderState->DescriptorManager, &RenderState->PipelineManager, &RenderState->TransferManager,
+                      DemoState->SwapChainFormat, &DemoState->UiState);
         
         VkDescriptorManagerFlush(RenderState->Device, &RenderState->DescriptorManager);
         VkTransferManagerFlush(&RenderState->TransferManager, RenderState->Device, RenderState->Commands.Buffer, &RenderState->BarrierManager);
     }
     
     VkCommandsSubmit(RenderState->GraphicsQueue, Commands);
-
-    // NOTE: Create UI
-    DemoState->UiState = UiStateCreate(RenderState->Device, &DemoState->Arena, &DemoState->TempArena, &RenderState->GpuArena,
-                                       &RenderState->DescriptorManager, &RenderState->PipelineManager,
-                                       DemoState->Scene.RenderMeshes[DemoState->Quad].VertexBuffer,
-                                       DemoState->Scene.RenderMeshes[DemoState->Quad].IndexBuffer,
-                                       DemoState->CopyToSwapTarget.RenderPass, 0);
 }
 
 DEMO_DESTROY(Destroy)
@@ -376,22 +374,28 @@ DEMO_MAIN_LOOP(MainLoop)
     {
         ui_state* UiState = &DemoState->UiState;
 
-        UiStateBegin(UiState, RenderState->WindowWidth, RenderState->WindowHeight);
+        ui_frame_input UiCurrInput = {};
+        UiCurrInput.MouseDown = CurrInput->MouseDown;
+        UiCurrInput.MousePixelPos = V2(CurrInput->MousePixelPos);
+        UiCurrInput.MouseScroll = CurrInput->MouseScroll;
+        Copy(CurrInput->KeysDown, UiCurrInput.KeysDown, sizeof(UiCurrInput.KeysDown));
+        UiStateBegin(UiState, RenderState->Device, RenderState->WindowWidth, RenderState->WindowHeight, UiCurrInput);
         
+#if 0
         local_global v4 ButtonColor = V4(1, 1, 1, 1);
         switch (UiButton(UiState, AabbCenterRadius(V2(100), V2(50)), ButtonColor))
         {
-            case UiInteraction_Hover:
+            case UiInteractionType_Hover:
             {
                 ButtonColor = V4(1, 0, 0, 1);
             } break;
 
-            case UiInteraction_Selected:
+            case UiInteractionType_Selected:
             {
                 ButtonColor = V4(0, 1, 0, 1);
             } break;
 
-            case UiInteraction_Released:
+            case UiInteractionType_Released:
             {
                 ButtonColor = V4(1, 0, 1, 1);
             } break;
@@ -401,9 +405,17 @@ DEMO_MAIN_LOOP(MainLoop)
                 ButtonColor = V4(1, 1, 1, 1);
             } break;
         }
+#endif
+        
+        if (UiButtonAnimated(UiState, AabbCenterRadius(V2(100), V2(50)), V4(0.1f, 0.4f, 0.9f, 1.0f)))
+        {
+        }
 
-        // if (UiButton(UiState, "Test Text"))
+        local_global f32 Test = 0.0f;
+        UiHorizontalSlider(UiState, AabbCenterRadius(V2(200), V2(100, 5)), V2(20), &Test);
 
+        UiStatePushGlyph(UiState, 'A', 0.5, AabbCenterRadius(V2(300), V2(50)), V4(1));
+        
         UiStateEnd(UiState);
     }
 
@@ -413,7 +425,10 @@ DEMO_MAIN_LOOP(MainLoop)
         Scene->NumOpaqueInstances = 0;
         Scene->NumWaterInstances = 0;
         Scene->NumPointLights = 0;
-        CameraUpdate(&Scene->Camera, CurrInput, PrevInput);
+        if (!(DemoState->UiState.MouseTouchingUi || DemoState->UiState.ProcessedInteraction))
+        {
+            CameraUpdate(&Scene->Camera, CurrInput, PrevInput);
+        }
         
         // NOTE: Populate scene
         {
@@ -590,10 +605,10 @@ DEMO_MAIN_LOOP(MainLoop)
 
     // NOTE: Render Scene
     TiledDeferredRender(Commands, &DemoState->TiledDeferredState, &DemoState->Scene);
+    UiStateRender(&DemoState->UiState, RenderState->Device, Commands, DemoState->TiledDeferredState.OutColorEntry.View);
 
     RenderTargetPassBegin(&DemoState->CopyToSwapTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
     FullScreenPassRender(Commands, DemoState->CopyToSwapPipeline, 1, &DemoState->CopyToSwapDesc);
-    UiStateRender(&DemoState->UiState, Commands);
     RenderTargetPassEnd(Commands);
     
     VkCheckResult(vkEndCommandBuffer(Commands.Buffer));

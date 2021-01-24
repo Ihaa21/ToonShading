@@ -313,6 +313,18 @@ DEMO_INIT(Init)
                                    DemoState->TiledDeferredState.Distortion.View, DemoState->TiledDeferredState.NoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
+        // NOTE: Push snow data
+        {
+            gpu_snow_globals* SnowGlobals = &DemoState->SnowGlobals;
+            SnowGlobals->SnowFallDir = (CameraGetV(&Scene->Camera) * V4(V3(0.2f, -1.0f, 0.0f), 0.0f)).xyz;
+            SnowGlobals->SnowColor = V3(0.75f, 0.75f, 1.0f);
+            SnowGlobals->SnowHeight = 0.05;
+            SnowGlobals->SnowAmount = 0.1;
+            SnowGlobals->SpecularPower = 32;
+            SnowGlobals->RimBound = 0.05;
+            SnowGlobals->RimThreshold = 0.01;
+        }
+
         // NOTE: Create UI
         UiStateCreate(RenderState->Device, &DemoState->Arena, &DemoState->TempArena, RenderState->LocalMemoryId,
                       &RenderState->DescriptorManager, &RenderState->PipelineManager, &RenderState->TransferManager,
@@ -373,50 +385,85 @@ DEMO_MAIN_LOOP(MainLoop)
     // NOTE: Update Ui State
     {
         ui_state* UiState = &DemoState->UiState;
-
+        
         ui_frame_input UiCurrInput = {};
         UiCurrInput.MouseDown = CurrInput->MouseDown;
         UiCurrInput.MousePixelPos = V2(CurrInput->MousePixelPos);
         UiCurrInput.MouseScroll = CurrInput->MouseScroll;
         Copy(CurrInput->KeysDown, UiCurrInput.KeysDown, sizeof(UiCurrInput.KeysDown));
-        UiStateBegin(UiState, RenderState->Device, RenderState->WindowWidth, RenderState->WindowHeight, UiCurrInput);
-        
-#if 0
-        local_global v4 ButtonColor = V4(1, 1, 1, 1);
-        switch (UiButton(UiState, AabbCenterRadius(V2(100), V2(50)), ButtonColor))
+        UiStateBegin(UiState, FrameTime, RenderState->WindowWidth, RenderState->WindowHeight, UiCurrInput);
+
+        gpu_snow_globals* SnowGlobals = &DemoState->SnowGlobals;
+        local_global v2 PanelPos = V2(100, 800);
+        ui_panel Panel = UiPanelBegin(UiState, &PanelPos, "Snow Panel");
+
         {
-            case UiInteractionType_Hover:
-            {
-                ButtonColor = V4(1, 0, 0, 1);
-            } break;
-
-            case UiInteractionType_Selected:
-            {
-                ButtonColor = V4(0, 1, 0, 1);
-            } break;
-
-            case UiInteractionType_Released:
-            {
-                ButtonColor = V4(1, 0, 1, 1);
-            } break;
-
-            default:
-            {
-                ButtonColor = V4(1, 1, 1, 1);
-            } break;
-        }
-#endif
-        
-        if (UiButtonAnimated(UiState, AabbCenterRadius(V2(100), V2(50)), V4(0.1f, 0.4f, 0.9f, 1.0f)))
-        {
+            UiPanelText(&Panel, "Snow Fall Dir:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelText(&Panel, "X:");
+            UiPanelNumberBox(&Panel, &SnowGlobals->SnowFallDir.x);
+            UiPanelText(&Panel, "Y:");
+            UiPanelNumberBox(&Panel, &SnowGlobals->SnowFallDir.y);
+            UiPanelText(&Panel, "Z:");
+            UiPanelNumberBox(&Panel, &SnowGlobals->SnowFallDir.z);
+            UiPanelNextRow(&Panel);
         }
 
-        local_global f32 Test = 0.0f;
-        UiHorizontalSlider(UiState, AabbCenterRadius(V2(200), V2(100, 5)), V2(20), &Test);
+        {
+            UiPanelText(&Panel, "Snow Height:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelHorizontalSlider(&Panel, 0, 0.05, &SnowGlobals->SnowHeight);
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->SnowHeight);
+            UiPanelNextRow(&Panel);
+        }
 
-        UiStatePushGlyph(UiState, 'A', 0.5, AabbCenterRadius(V2(300), V2(50)), V4(1));
+        {
+            UiPanelText(&Panel, "Snow Amount:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelHorizontalSlider(&Panel, 0, 1, &SnowGlobals->SnowAmount);
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->SnowAmount);
+            UiPanelNextRow(&Panel);
+        }
+
+        {
+            UiPanelText(&Panel, "Snow Color:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelText(&Panel, "R:");
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->SnowColor.r);
+            UiPanelText(&Panel, "G:");
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->SnowColor.g);
+            UiPanelText(&Panel, "B:");
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->SnowColor.b);
+            UiPanelNextRow(&Panel);
+        }
+
+        {
+            UiPanelText(&Panel, "Snow Specular Power:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelHorizontalSlider(&Panel, 0, 64, &SnowGlobals->SpecularPower);
+            UiPanelNumberBox(&Panel, 0, 64, &SnowGlobals->SpecularPower);
+            UiPanelNextRow(&Panel);
+        }
+
+        {
+            UiPanelText(&Panel, "Snow Rim Bound:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelHorizontalSlider(&Panel, 0, 1, &SnowGlobals->RimBound);
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->RimBound);
+            UiPanelNextRow(&Panel);
+        }
+
+        {
+            UiPanelText(&Panel, "Snow Rim Threshold:");
+            UiPanelNextRowIndent(&Panel);
+            UiPanelHorizontalSlider(&Panel, 0, 1, &SnowGlobals->RimThreshold);
+            UiPanelNumberBox(&Panel, 0, 1, &SnowGlobals->RimThreshold);
+            UiPanelNextRow(&Panel);
+        }
+
+        UiPanelEnd(&Panel);
         
-        UiStateEnd(UiState);
+        UiStateEnd(UiState, &RenderState->DescriptorManager);
     }
 
     // NOTE: Upload scene data
@@ -473,11 +520,11 @@ DEMO_MAIN_LOOP(MainLoop)
                 }
 #endif
                 
-                SceneOpaqueInstanceAdd(Scene, DemoState->Sphere, M4Pos(V3(0.0f, 0.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
+                SceneOpaqueInstanceAdd(Scene, DemoState->Sphere, M4Pos(V3(0.0f, 3.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
                                        32, 0.716, 0.1);
 
                 // NOTE: Snow
-                SceneOpaqueInstanceAdd(Scene, DemoState->Face, M4Pos(V3(0.0f, 3.0f, 0.0f)) * M4Scale(V3(1.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
+                SceneOpaqueInstanceAdd(Scene, DemoState->Face, M4Pos(V3(0.0f, 0.0f, -0.5f)) * M4Rotation(V3(0.0f, Pi32, 0.0f)) * M4Scale(V3(3.0f)), V4(0.3f, 0.3f, 0.9f, 1.0f),
                                        32, 0.716, 0.1, true);
                 
                 SceneOpaqueInstanceAdd(Scene, DemoState->Cube, M4Pos(V3(-3, 0, 0)) * M4Scale(V3(1, 10, 10)), V4(0.7f, 0.3f, 0.3f, 1.0f),
@@ -539,12 +586,10 @@ DEMO_MAIN_LOOP(MainLoop)
         // NOTE: Push snow data
         {
             gpu_snow_globals* Data = VkTransferPushWriteStruct(&RenderState->TransferManager, Scene->SnowGlobalBuffer, gpu_snow_globals,
-                                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
-                                                            BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
-            *Data = {};
-
-            v3 Dir = Normalize(V3(0.2f, -1.0f, 0.0f));
-            Data->SnowFallDir = (CameraGetV(&Scene->Camera) * V4(Dir, 0.0f)).xyz;
+                                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT),
+                                                               BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
+            *Data = DemoState->SnowGlobals;
+            Data->SnowFallDir = (CameraGetV(&Scene->Camera) * V4(Normalize(DemoState->SnowGlobals.SnowFallDir), 0.0f)).xyz;
         }
         
         // NOTE: Push Point Lights

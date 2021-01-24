@@ -123,6 +123,7 @@ layout(set = 0, binding = 11) uniform sampler2D GBufferDepthTexture;
 SCENE_DESCRIPTOR_LAYOUT(1)
 MATERIAL_DESCRIPTOR_LAYOUT(2)
 
+// NOTE: Water
 layout(set = 3, binding = 0) uniform sampler2D PerlinNoise;
 layout(set = 3, binding = 1) uniform sampler2D Distortion;
 layout(set = 3, binding = 2) uniform water_inputs
@@ -360,11 +361,6 @@ void main()
 // NOTE: GBuffer Snow Vertex
 //
 
-// NOTE: Snow inputs
-vec3 SnowColor = vec3(0.75, 0.75, 1);
-float SnowHeight = 0.05;
-float SnowAmount = 0.1;
-
 #if GBUFFER_SNOW_VERT
 
 layout(location = 0) in vec3 InPos;
@@ -379,14 +375,14 @@ layout(location = 3) out flat uint OutInstanceId;
 void main()
 {
     instance_entry Entry = InstanceBuffer[gl_InstanceIndex];
-
-    vec3 ViewNormal = (Entry.WVTransform * vec4(InNormal, 0)).xyz;
-    float SnowAngle = -dot(SnowBuffer.SnowFallDir, ViewNormal);
-
+    vec3 ViewNormal = normalize((Entry.WVTransform * vec4(InNormal, 0)).xyz);
     vec3 SnowPos = InPos;
-    if (SnowAngle > SnowAmount)
+
+    float SnowAngle = dot(-SnowInputs.SnowFallDir, ViewNormal);
+    float ReMappedSnowAmount = 2.0 * (1 - SnowInputs.SnowAmount) - 1;
+    if (SnowAngle >= ReMappedSnowAmount + 0.4)
     {
-        SnowPos += InNormal * SnowAngle * SnowHeight;
+        SnowPos += InNormal * SnowInputs.SnowHeight;
     }
     
     gl_Position = Entry.WVPTransform * vec4(SnowPos, 1);
@@ -465,19 +461,50 @@ void main()
 
     if (MaterialId.y == 1)
     {
+        /*
+
+          Properties{
+          _Color("Main Color", Color) = (0.5,0.5,0.5,1)
+          _MainTex("Base (RGB)", 2D) = "white" {}
+          _Ramp("Toon Ramp (RGB)", 2D) = "gray" {}
+          _SnowRamp("Snow Toon Ramp (RGB)", 2D) = "gray" {}
+          _SnowAngle("Angle of snow buildup", Vector) = (0,1,0)
+          _SnowColor("Snow Base Color", Color) = (0.5,0.5,0.5,1)
+          _TColor("Snow Top Color", Color) = (0.5,0.5,0.5,1)
+          _RimColor("Snow Rim Color", Color) = (0.5,0.5,0.5,1)
+          _RimPower("Snow Rim Power", Range(0,4)) = 3
+          _SnowSize("Snow Amount", Range(-2,2)) = 1 
+          _Height("Snow Height", Range(0,0.2)) = 0.1
+          
+        half d = dot(o.Normal, IN.lightDir)*0.5 + 0.5; // light value for snow toon ramp
+        half3 rampS = tex2D(_SnowRamp, float2(d, d)).rgb; // snow toon ramp
+        o.Albedo = c.rgb * _Color;// base color
+        half rim = 1.0 - saturate(dot(normalize(IN.viewDir), o.Normal)); // rimlight
+
+        if (dot( o.Normal, _SnowAngle.xyz) >= _SnowSize -0.4) { // if dot product result is higher than snow amount, we turn it into snow
+            o.Albedo = (lerp(_SnowColor * rampS, _TColor * rampS, saturate(localPos.y))); // blend base snow with top snow based on position
+            o.Emission = _RimColor.rgb *pow(rim, _RimPower);// add glow rimlight to snow
+        }
+        o.Alpha = c.a;
+        */
+        
         // NOTE: We have snow on this object
-        float SnowAngle = -dot(SnowBuffer.SnowFallDir, SurfaceNormal);
-        if (SnowAngle > SnowAmount)
+        float SnowAngle = dot(-SnowInputs.SnowFallDir, SurfaceNormal);
+        float ReMappedSnowAmount = 2.0 * (1 - SnowInputs.SnowAmount) - 1;
+        
+        if (SnowAngle >= ReMappedSnowAmount)
         {
-            SurfaceColor = SnowColor;
-            Entry.SpecularPower = 32;
-            Entry.RimBound = 0.05;
-            Entry.RimThreshold = 0.01;
+            // NOTE: Interplate between snow base and snow top color
+            float TValue = clamp((SnowAngle - ReMappedSnowAmount) / 0.4, 0, 1);
+            vec3 LerpedSnowColor = mix(SnowInputs.SnowColor, vec3(0.6, 0.6, 1), TValue);
             
+            SurfaceColor = LerpedSnowColor;
+            Entry.SpecularPower = SnowInputs.SpecularPower;
+            Entry.RimBound = SnowInputs.RimBound;
+            Entry.RimThreshold = SnowInputs.RimThreshold;
             // TODO: Modify lighting properties since we have snow
         }
-    }
-    
+    }    
     vec3 Color = vec3(0);
 
 #if 0

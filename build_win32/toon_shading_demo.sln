@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.271
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "toon_shading_demo", "toon_shading_demo.exe", "{85FB84C8-6EF6-446D-BB8E-DB110676A52E}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "toon_shading_demo", "toon_shading_demo.exe", "{9F22A732-9AA9-4751-94EE-13A996B34935}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
 		Executable = D:\Code\Demos\ToonShading\build_win32\toon_shading_demo.exe
@@ -21,12 +21,12 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{85FB84C8-6EF6-446D-BB8E-DB110676A52E}.Release|x64.ActiveCfg = Release|x64
+		{9F22A732-9AA9-4751-94EE-13A996B34935}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {CA8EAF04-608E-48F9-AB3F-40E8A62198E9}
+		SolutionGuid = {B5DDF78F-A853-419C-9FBB-7B357BBACFD8}
 	EndGlobalSection
 EndGlobal

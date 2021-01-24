@@ -85,6 +85,14 @@ struct gpu_water_inputs
 struct gpu_snow_globals
 {
     v3 SnowFallDir; // NOTE: In View Space
+    f32 SnowHeight;
+    v3 SnowColor;
+    f32 SnowAmount;
+    
+    f32 SpecularPower;
+    f32 RimBound;
+    f32 RimThreshold;
+    u32 Pad;
 };
 
 struct render_mesh
@@ -177,8 +185,11 @@ struct demo_state
     u32 Sphere;
     u32 Face;
 
+    // NOTE: Snow
+    gpu_snow_globals SnowGlobals;
+    
     tiled_deferred_state TiledDeferredState;
-
+    
     ui_state UiState;
 };
 

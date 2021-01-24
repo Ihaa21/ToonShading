@@ -61,9 +61,15 @@ struct instance_entry
         water_entry WaterBuffer[];                                      \
     };                                                                  \
                                                                         \
-    layout(set = set_number, binding = 6) uniform snow_buffer           \
+    layout(set = set_number, binding = 6) uniform snow_inputs           \
     {                                                                   \
         vec3 SnowFallDir;                                               \
-    } SnowBuffer;                                                       \
+        float SnowHeight;                                               \
+        vec3 SnowColor;                                                 \
+        float SnowAmount;                                               \
+        float SpecularPower;                                            \
+        float RimBound;                                                 \
+        float RimThreshold;                                             \
+    } SnowInputs;                                                       \
                                                                         \
     

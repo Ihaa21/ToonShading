@@ -136,7 +136,7 @@ inline void TiledDeferredCreate(renderer_create_info CreateInfo, VkDescriptorSet
     *Result = {};
 
     u64 HeapSize = GigaBytes(1);
-    Result->RenderTargetArena = VkLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->LocalMemoryId, HeapSize), HeapSize);
+    Result->RenderTargetArena = VkLinearArenaCreate(RenderState->Device, RenderState->LocalMemoryId, HeapSize);
     
     // NOTE: Create globals
     {        
